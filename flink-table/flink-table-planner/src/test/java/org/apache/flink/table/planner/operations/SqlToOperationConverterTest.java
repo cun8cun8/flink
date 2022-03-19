@@ -135,7 +135,7 @@ import static org.assertj.core.api.InstanceOfAssertFactories.type;
 /** Test cases for {@link SqlToOperationConverter}. */
 public class SqlToOperationConverterTest {
     private final boolean isStreamingMode = false;
-    private final TableConfig tableConfig = new TableConfig();
+    private final TableConfig tableConfig = TableConfig.getDefault();
     private final Catalog catalog = new GenericInMemoryCatalog("MockCatalog", "default");
     private final CatalogManager catalogManager =
             CatalogManagerMocks.preparedCatalogManager()
@@ -398,7 +398,7 @@ public class SqlToOperationConverterTest {
     public void testShowTables() {
         final String sql = "SHOW TABLES from cat1.db1 not like 't%'";
         Operation operation = parse(sql, SqlDialect.DEFAULT);
-        assert operation instanceof ShowTablesOperation;
+        assertThat(operation).isInstanceOf(ShowTablesOperation.class);
 
         ShowTablesOperation showTablesOperation = (ShowTablesOperation) operation;
         assertThat(showTablesOperation.getCatalogName()).isEqualTo("cat1");
@@ -1730,7 +1730,7 @@ public class SqlToOperationConverterTest {
     // ~ Tool Methods ----------------------------------------------------------
 
     private static TestItem createTestItem(Object... args) {
-        assert args.length == 2;
+        assertThat(args).hasSize(2);
         final String testExpr = (String) args[0];
         TestItem testItem = TestItem.fromTestExpr(testExpr);
         if (args[1] instanceof String) {

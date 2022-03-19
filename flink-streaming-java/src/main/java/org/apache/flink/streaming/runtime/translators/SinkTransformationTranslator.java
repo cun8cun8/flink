@@ -31,6 +31,7 @@ import org.apache.flink.streaming.api.connector.sink2.StandardSinkTopologies;
 import org.apache.flink.streaming.api.connector.sink2.WithPostCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreCommitTopology;
 import org.apache.flink.streaming.api.connector.sink2.WithPreWriteTopology;
+import org.apache.flink.streaming.api.datastream.CustomSinkOperatorUidHashes;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.graph.TransformationTranslator;
@@ -257,7 +258,10 @@ public class SinkTransformationTranslator<Input, Output>
             List<Transformation<?>> expandedTransformations =
                     transformations.subList(numTransformsBefore, transformations.size());
 
+            final CustomSinkOperatorUidHashes operatorsUidHashes =
+                    transformation.getSinkOperatorsUidHashes();
             for (Transformation<?> subTransformation : expandedTransformations) {
+
                 String subUid = subTransformation.getUid();
                 if (isExpandedTopology && subUid != null && !subUid.isEmpty()) {
                     checkState(
@@ -267,6 +271,18 @@ public class SinkTransformationTranslator<Input, Output>
                                     + " requires to set a uid since its customized topology"
                                     + " has set uid for some operators.");
                 }
+
+                // Set the operator uid hashes to support stateful upgrades without prior uids
+                setOperatorUidHashIfPossible(
+                        subTransformation, WRITER_NAME, operatorsUidHashes.getWriterUidHash());
+                setOperatorUidHashIfPossible(
+                        subTransformation,
+                        COMMITTER_NAME,
+                        operatorsUidHashes.getCommitterUidHash());
+                setOperatorUidHashIfPossible(
+                        subTransformation,
+                        StandardSinkTopologies.GLOBAL_COMMITTER_TRANSFORMATION_NAME,
+                        operatorsUidHashes.getGlobalCommitterUidHash());
 
                 concatUid(
                         subTransformation,
@@ -323,15 +339,26 @@ public class SinkTransformationTranslator<Input, Output>
             return result;
         }
 
+        private void setOperatorUidHashIfPossible(
+                Transformation<?> transformation,
+                String writerName,
+                @Nullable String operatorUidHash) {
+            if (operatorUidHash == null || !transformation.getName().equals(writerName)) {
+                return;
+            }
+            transformation.setUidHash(operatorUidHash);
+        }
+
         private void concatUid(
                 Transformation<?> subTransformation,
                 Function<Transformation<?>, String> getter,
                 BiConsumer<Transformation<?>, String> setter,
                 @Nullable String transformationName) {
             if (transformationName != null && getter.apply(transformation) != null) {
-                // Use the same uid pattern than for Sink V1
+                // Use the same uid pattern than for Sink V1. We deliberately decided to use the uid
+                // pattern of Flink 1.13 because 1.14 did not have a dedicated committer operator.
                 if (transformationName.equals(COMMITTER_NAME)) {
-                    final String committerFormat = "Sink %s Committer";
+                    final String committerFormat = "Sink Committer: %s";
                     setter.accept(
                             subTransformation,
                             String.format(committerFormat, getter.apply(transformation)));
@@ -343,7 +370,7 @@ public class SinkTransformationTranslator<Input, Output>
                     return;
                 }
 
-                // Use the same uid pattern than for Sink V1
+                // Use the same uid pattern than for Sink V1 in Flink 1.14.
                 if (transformationName.equals(
                         StandardSinkTopologies.GLOBAL_COMMITTER_TRANSFORMATION_NAME)) {
                     final String committerFormat = "Sink %s Global Committer";

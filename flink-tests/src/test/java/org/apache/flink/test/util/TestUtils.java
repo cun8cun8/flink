@@ -18,13 +18,10 @@
 
 package org.apache.flink.test.util;
 
-import org.apache.flink.api.common.JobID;
-import org.apache.flink.client.ClientUtils;
 import org.apache.flink.client.program.ClusterClient;
 import org.apache.flink.core.execution.JobClient;
 import org.apache.flink.runtime.checkpoint.Checkpoints;
 import org.apache.flink.runtime.checkpoint.metadata.CheckpointMetadata;
-import org.apache.flink.runtime.client.JobInitializationException;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.state.CompletedCheckpointStorageLocation;
 import org.apache.flink.runtime.state.filesystem.AbstractFsCheckpointStorageAccess;
@@ -35,7 +32,9 @@ import org.apache.flink.util.ExceptionUtils;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Comparator;
@@ -89,16 +88,6 @@ public class TestUtils {
                 .toJobExecutionResult(classLoader);
     }
 
-    public static void waitUntilJobInitializationFinished(
-            JobID id, MiniClusterWithClientResource miniCluster, ClassLoader userCodeClassloader)
-            throws JobInitializationException {
-        ClusterClient<?> clusterClient = miniCluster.getClusterClient();
-        ClientUtils.waitUntilJobInitializationFinished(
-                () -> clusterClient.getJobStatus(id).get(),
-                () -> clusterClient.requestJobResult(id).get(),
-                userCodeClassloader);
-    }
-
     public static CheckpointMetadata loadCheckpointMetadata(String savepointPath)
             throws IOException {
         CompletedCheckpointStorageLocation location =
@@ -138,8 +127,15 @@ public class TestUtils {
                                     path.getFileName().toString().equals(METADATA_FILE_NAME))
                     .findAny()
                     .isPresent();
-        } catch (IOException e) {
-            ExceptionUtils.rethrow(e);
+        } catch (UncheckedIOException uncheckedIOException) {
+            // return false when the metadata file is in progress due to subsumed checkpoint
+            if (ExceptionUtils.findThrowable(uncheckedIOException, NoSuchFileException.class)
+                    .isPresent()) {
+                return false;
+            }
+            throw uncheckedIOException;
+        } catch (IOException ioException) {
+            ExceptionUtils.rethrow(ioException);
             return false; // should never happen
         }
     }
