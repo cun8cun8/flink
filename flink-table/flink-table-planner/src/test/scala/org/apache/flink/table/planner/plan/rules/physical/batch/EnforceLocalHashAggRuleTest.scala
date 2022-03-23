@@ -38,7 +38,7 @@ class EnforceLocalHashAggRuleTest extends EnforceLocalAggRuleTestBase {
   @Before
   override def setup(): Unit = {
     super.setup()
-    val program = FlinkBatchProgram.buildProgram(util.tableEnv.getConfig.getConfiguration)
+    val program = FlinkBatchProgram.buildProgram(util.tableEnv.getConfig)
     // remove the original BatchExecHashAggRule and add BatchExecHashAggRuleForOnePhase
     // to let the physical phase generate one phase aggregate
     program.getFlinkRuleSetProgram(FlinkBatchProgram.PHYSICAL)
@@ -51,9 +51,9 @@ class EnforceLocalHashAggRuleTest extends EnforceLocalAggRuleTestBase {
       .replaceBatchProgram(program).build()
     util.tableEnv.getConfig.setPlannerConfig(calciteConfig)
     // only enabled HashAgg
-    util.tableEnv.getConfig.getConfiguration.setString(
+    util.tableEnv.getConfig.set(
       ExecutionConfigOptions.TABLE_EXEC_DISABLED_OPERATORS, "SortAgg")
-    util.tableEnv.getConfig.getConfiguration.setString(
+    util.tableEnv.getConfig.set(
       OptimizerConfigOptions.TABLE_OPTIMIZER_AGG_PHASE_STRATEGY, "TWO_PHASE")
   }
 

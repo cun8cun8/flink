@@ -33,7 +33,6 @@ import org.apache.flink.table.api.config.TableConfigOptions;
 import org.apache.flink.table.delegation.Executor;
 import org.apache.flink.util.Preconditions;
 
-import java.math.MathContext;
 import java.time.Duration;
 import java.time.ZoneId;
 import java.util.HashMap;
@@ -97,6 +96,10 @@ import static java.time.ZoneId.SHORT_IDS;
 @PublicEvolving
 public final class TableConfig implements WritableConfig, ReadableConfig {
 
+    /** Please use {@link TableConfig#getDefault()} instead. */
+    @Deprecated
+    public TableConfig() {}
+
     // Note to implementers:
     // TableConfig is a ReadableConfig which is built once the TableEnvironment is created and
     // contains both the configuration defined in the execution context (flink-conf.yaml + CLI
@@ -109,17 +112,8 @@ public final class TableConfig implements WritableConfig, ReadableConfig {
     //
     // The set() methods only impact the application-specific configuration.
 
-    /** Defines if all fields need to be checked for NULL first. */
-    private Boolean nullCheck = true;
-
     /** Defines the configuration of Planner for Table API and SQL queries. */
     private PlannerConfig plannerConfig = PlannerConfig.EMPTY_CONFIG;
-
-    /**
-     * Defines the default context for decimal division calculation. We use Scala's default
-     * MathContext.DECIMAL128.
-     */
-    private MathContext decimalContext = MathContext.DECIMAL128;
 
     /**
      * A configuration object to hold all configuration that has been set specifically in the Table
@@ -209,6 +203,15 @@ public final class TableConfig implements WritableConfig, ReadableConfig {
      */
     public Configuration getConfiguration() {
         return configuration;
+    }
+
+    /**
+     * Gives direct access to the underlying environment-specific key-value map for advanced
+     * configuration.
+     */
+    @Internal
+    public ReadableConfig getRootConfiguration() {
+        return rootConfiguration;
     }
 
     /**
@@ -312,16 +315,6 @@ public final class TableConfig implements WritableConfig, ReadableConfig {
         }
     }
 
-    /** Returns the NULL check. If enabled, all fields need to be checked for NULL first. */
-    public Boolean getNullCheck() {
-        return nullCheck;
-    }
-
-    /** Sets the NULL check. If enabled, all fields need to be checked for NULL first. */
-    public void setNullCheck(Boolean nullCheck) {
-        this.nullCheck = Preconditions.checkNotNull(nullCheck);
-    }
-
     /** Returns the current configuration of Planner for Table API and SQL queries. */
     public PlannerConfig getPlannerConfig() {
         return plannerConfig;
@@ -333,22 +326,6 @@ public final class TableConfig implements WritableConfig, ReadableConfig {
      */
     public void setPlannerConfig(PlannerConfig plannerConfig) {
         this.plannerConfig = Preconditions.checkNotNull(plannerConfig);
-    }
-
-    /**
-     * Returns the default context for decimal division calculation. {@link
-     * java.math.MathContext#DECIMAL128} by default.
-     */
-    public MathContext getDecimalContext() {
-        return decimalContext;
-    }
-
-    /**
-     * Sets the default context for decimal division calculation. {@link
-     * java.math.MathContext#DECIMAL128} by default.
-     */
-    public void setDecimalContext(MathContext decimalContext) {
-        this.decimalContext = Preconditions.checkNotNull(decimalContext);
     }
 
     /**
